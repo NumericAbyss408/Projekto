@@ -1779,8 +1779,8 @@ class SettingsEditor(ft.Container):
 			super().__init__(MainLabel,DullLabel)
 			self._Entry = ft.TextField(
 				value="",
-				input_filter=ft.InputFilter(UTIL.PATH_REGEX),
 				expand=True,
+				on_change= lambda evt: self.SetValue(str(evt.data))
 			)
 			self._SettingRow.controls.append(self._Entry)
 			self.value = ""
@@ -1789,6 +1789,32 @@ class SettingsEditor(ft.Container):
 			self.value = self._Entry.value = v
 			self.Replicate()
 
+	class DirEntry(TextEntry):
+		def __init__(self, MainLabel: str, DullLabel: str):
+			super().__init__(MainLabel, DullLabel)
+			self._Entry.on_change = self.Validate
+
+		def Validate(self, evt:ft.Event[ft.TextField]):
+			supposedPath = UTIL.Path(str(evt.data))
+			supposedPath.resolve()
+			FormatCheck = supposedPath.exists()
+			try: assert FormatCheck
+			except AssertionError:
+				self._Entry.error = "Either this is not a path or it does not exist."
+				return
+
+			AbsolutePathCheck = supposedPath.is_absolute()
+			try: assert AbsolutePathCheck
+			except AssertionError:
+				self._Entry.error = "This path is not absolute."
+				return
+
+			self._Entry.error = None
+			self.SetValue(str(evt.data))
+
+			
+
+			
 	class RotateEntry(SettingEntry):
 		def __init__(self, MainLabel:str, DullLabel:str):
 			super().__init__(MainLabel,DullLabel)
@@ -1837,7 +1863,7 @@ class SettingsEditor(ft.Container):
 			self.ColourPicker.SetWithHex(col)
 			
 	def __init__(self):
-		self.SuperDirEntry = SettingsEditor.TextEntry(
+		self.SuperDirEntry = SettingsEditor.DirEntry(
 			"Super-Directory",
 			"Projekt Parent Folder"
 		)
