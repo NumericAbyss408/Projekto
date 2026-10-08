@@ -89,6 +89,15 @@ def Tint(col:str, intensity:int = 20):
 def Dim(col:str, intensity:int = 20):
 	return MockTheme(lambda: Tint(col,intensity))
 	
+def AbsoluteColor():
+	match CurrentTheme:
+		case ThemeMode.LIGHT: return "#000000"
+		case ThemeMode.DARK: return "#ffffff"
+
+def AbsoluteOpposite():
+	return MockTheme(
+		AbsoluteColor
+	)
 
 def ThemedBG():
 	return taj(ThemeColors['FlatColor'])
@@ -142,8 +151,11 @@ def CTA_Contrast(t:ft.Container):
 
 def ApplyFieldTheme(Target:ft.FormFieldControl, Color:str):
 	Target.label_style = ft.TextStyle(
-		color= "#ffffff",
+		color= AbsoluteColor(),
 		decoration= ft.TextDecoration.UNDERLINE
+	)
+	Target.error_style = ft.TextStyle(
+		color= Tint(Color)
 	)
 	match ThemeColors['OrnationMode']:
 		case Settings.OrnationModeENUM.UNBOUND:
@@ -161,8 +173,8 @@ def ApplyFieldTheme(Target:ft.FormFieldControl, Color:str):
 					width=3,
 					color= Tint(Color)
 				)),
-			 	ft.ControlState.DISABLED: ft.OutlineInputBorder(side=ft.BorderSide(
-			 		width=3,
+			 	ft.ControlState.ERROR: ft.OutlineInputBorder(side=ft.BorderSide(
+			 		width = 1,
 			 		color= Tint(Neu(Dim(Color)))
 			 	)),
 			}
@@ -178,10 +190,10 @@ def ApplyFieldTheme(Target:ft.FormFieldControl, Color:str):
 					width=3,
 					color= Tint(Color)
 				)),
-				ft.ControlState.DISABLED: ft.BorderSide(
-					width=3,
+				ft.ControlState.ERROR: ft.OutlineInputBorder(side=ft.BorderSide(
+					width=1,
 					color= Tint(Neu(Dim(Color)))
-				)
+				))
 			}
 
 def FTA_Accent(t:ft.FormFieldControl):

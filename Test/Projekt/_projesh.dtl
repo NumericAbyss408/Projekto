@@ -2,9 +2,7 @@
 	"Name": "Zan!Projekto",
 	"Identifier": "1234567",
 	"Description": "",
-	"Tags": [
-		"34808"
-	],
+	"Tags": [],
 	"Tasks": [
 		{
 			"Name": "test",

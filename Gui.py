@@ -423,8 +423,7 @@ class ProjektCreator(ft.Container):
 			[view.GetTag() for view in self.TagList.controls]
 		)
 
-		NavigationBar().ScopeInto(
-			newProjekt.GetName(),
+		NavigationBar().NavInto(
 			newProjekt.GetFolder()
 		)
 
@@ -717,11 +716,12 @@ class ProjektFullView(ft.Container):
 			)
 
 		def mkProjekt(self):
-			p.New(
+			inst = p.New(
 				ProjektFullView().GetProjekt().GetFolder(),
 				self._content,
 				"",
 			)
+			ProjektList().ExtendProjektDisplay([inst])
 			ProjektFullView().Reload()
 			
 	def __init__(self):
@@ -808,7 +808,6 @@ class ProjektFullView(ft.Container):
 			indicator_color= th.ThemeColors["HiltColor"],
 			label_color= th.Tint(th.ThemeColors["HiltColor"], 85),
 			overlay_color=th.Dim(th.ThemeColors["HiltColor"], 85),
-			on_click= self.OnTabChanged
 		)
 		self._TabViews = ft.TabBarView(
 			expand=9,
@@ -884,18 +883,11 @@ class ProjektFullView(ft.Container):
 			TaskSimpleView(task)
 			for task in projekt.GetTasks()
 		]
+		self._ContentColumn.controls = [
+			ProjektFullView.ContentUnit(c)
+			for c in self._LoadedProjekt.GetContent()
+		]
 		self._ProjektTitleEntry.value = projekt.GetName()
-
-	def OnTabChanged(self, evt:ft.Event[ft.TabBar]):
-		if self._LoadedProjekt is None: return
-		match evt.data:
-			case 0: pass
-			case 1: pass
-			case 2:
-				self._ContentColumn.controls = [
-					ProjektFullView.ContentUnit(c)
-					for c in self._LoadedProjekt.GetContent()
-				]
 
 	def AddSelectedTags(self, selected:list[t]):
 		self._LoadedProjekt.GetTags().extend([
@@ -1310,7 +1302,10 @@ class SearchBox(ft.Container):
 		searchString = self.SearchBar.value
 
 		pList: list[p] = Core.Search(
-			str(NavigationBar().GetCurrentDir()),
+			str(NavigationBar()
+			    .GetCurrentHistory()
+				.GetCurrentDir()
+			),
 			searchString,
 			tList
 		)
@@ -1780,8 +1775,18 @@ class SettingsEditor(ft.Container):
 			self._Entry = ft.TextField(
 				value="",
 				expand=True,
+				cursor_color= th.AbsoluteColor(),
+				cursor_error_color= th.AbsoluteColor(),
 				on_change= lambda evt: self.SetValue(str(evt.data))
 			)
+			th.MockOrnationMode(
+				lambda: th.ApplyFieldTheme(
+					self._Entry,
+					th.ThemeColors["HiltColor"]
+				),
+				cf.OrnationModeENUM.CONTOUR
+			)
+			
 			self._SettingRow.controls.append(self._Entry)
 			self.value = ""
 
@@ -2008,7 +2013,6 @@ class EditorSwitcher(ft.Container):
 @UTIL.singleton
 class MainGrid(ft.Container):
 	def __init__(self):
-		print("Ante Up!")
 		###
 		self.searchBarArea = ft.Container(
 			expand=True,

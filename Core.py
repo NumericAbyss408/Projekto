@@ -174,7 +174,7 @@ class Projekt:
 					for task in self._Tasks
 				]
 			}
-			projesh.write(UTIL.json.dumps(payload))
+			projesh.write(UTIL.json.dumps(payload, indent="\t"))
 
 	def OpenInExplorer(self):
 		fm.show_in_file_manager(
@@ -308,7 +308,6 @@ class Settings:
 			LoadedJSON: Settings.SettingsJSON = UTIL.json.loads(settingsfile.read())
 			self._MainDir = Path(LoadedJSON["SuperDirectory"])
 			self._Theme = LoadedJSON["HiltTheme"]
-			print("settings loaded!")
 
 	def GetSuperDir(self):
 		return self._MainDir
