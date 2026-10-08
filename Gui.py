@@ -417,7 +417,9 @@ class ProjektCreator(ft.Container):
 			return #no text
 
 		newProjekt = p.New(
-			NavigationBar().GetCurrentDir(),
+			NavigationBar()
+				.GetCurrentHistory()
+				.GetCurrentDir(),
 			self.TitleText.value,
 			self.DescriptionText.value,
 			[view.GetTag() for view in self.TagList.controls]
