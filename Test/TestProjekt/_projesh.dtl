@@ -1,1 +1,7 @@
-{"Name": "TestProjekt", "Identifier": "3717785", "Description": "123.567", "Tags": [], "Tasks": []}
+{
+	"Name": "TestProjekt",
+	"Identifier": "3717785",
+	"Description": "123.567",
+	"Tags": [],
+	"Tasks": []
+}

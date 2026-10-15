@@ -1,1 +1,42 @@
-{}
+{
+	"82361": {
+		"name": "COM2042",
+		"color": "#2E95FF"
+	},
+	"37147": {
+		"name": "Personal Projects",
+		"color": "#C900FF"
+	},
+	"98366": {
+		"name": "DELTA SPEED",
+		"color": "#00FF9F"
+	},
+	"58539": {
+		"name": "Video editing",
+		"color": "#FF0000"
+	},
+	"06974": {
+		"name": "COM2028",
+		"color": "#C0C2E7"
+	},
+	"45043": {
+		"name": "COM2040",
+		"color": "#00C3BB"
+	},
+	"51082": {
+		"name": "COM2041",
+		"color": "#140077"
+	},
+	"21295": {
+		"name": "TestTag3",
+		"color": "#444444"
+	},
+	"95487": {
+		"name": "TestTag4",
+		"color": "#444444"
+	},
+	"65742": {
+		"name": "test5",
+		"color": "#444444"
+	}
+}

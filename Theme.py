@@ -208,7 +208,8 @@ def ApplyButtonTheme(Target:ft.Button, Color:str = ThemeColors['HiltColor']):
 		bgcolor= {
 			ft.ControlState.DEFAULT: Dim(taj(Color),50),
 			ft.ControlState.HOVERED: Dim(Neu(Color),50),
-			ft.ControlState.PRESSED: Tint(Color, 90)
+			ft.ControlState.PRESSED: Tint(Color, 90),
+			ft.ControlState.DISABLED: Tint(Neu(Color),75),
 		} 
 	)
 

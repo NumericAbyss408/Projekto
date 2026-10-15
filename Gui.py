@@ -185,13 +185,13 @@ class TagSelector(ft.Container):
 		###
 		self.selected:list[TagView] = []
 		
-		self.TagColumn = ft.Column(
-			expand= 5,
+		self.TagColumn = ft.ListView(
+			expand= 7,
 			controls= []
 		)
 
 		self.ButtonColumn = ft.Column(
-			expand= 4,
+			expand= 3,
 			controls= []
 		)
 		###
@@ -739,13 +739,7 @@ class ProjektFullView(ft.Container):
 			content="Add New Tag",
 			icon=ft.Icons.ADD,
 			align=ft.Alignment.CENTER,
-			on_click= lambda evt: TagSelector().Open([
-				(
-					"Add Tag",
-					"#a0f",
-					lambda sel: self.AddSelectedTags(sel)
-				)
-			])
+			on_click= lambda evt: self.PromptTagSelect()
 		)
 		th.ApplyButtonTheme(self._newTagButton)
 		self._ProjektTagList = ft.Column(
@@ -828,7 +822,8 @@ class ProjektFullView(ft.Container):
 			input_filter= ft.InputFilter(
 				allow=True,
 				regex_string= UTIL.FOLDER_REGEX
-			)
+			),
+			on_change=self.flushTextChanges
 		)
 		th.FTA_Contrast(self._ProjektTitleEntry)
 
@@ -891,6 +886,22 @@ class ProjektFullView(ft.Container):
 		]
 		self._ProjektTitleEntry.value = projekt.GetName()
 
+	def flushTextChanges(self):
+		if self._LoadedProjekt is None: return
+		self._LoadedProjekt.SetName(
+			self._ProjektTitleEntry.value
+		)
+
+	def PromptTagSelect(self):
+		if self._LoadedProjekt is None: return
+		TagSelector().Open([
+			(
+				"Add Tag",
+				"#a0f",
+				lambda sel: self.AddSelectedTags(sel)
+			)
+		])
+
 	def AddSelectedTags(self, selected:list[t]):
 		self._LoadedProjekt.GetTags().extend([
 			tag for tag in selected
@@ -908,6 +919,7 @@ class ProjektFullView(ft.Container):
 			)
 			for tag in self._LoadedProjekt.GetTags()
 		]
+		TagSelector().Close()
 
 	def MkTask(self):
 		if self._LoadedProjekt is None: return
@@ -1334,6 +1346,7 @@ class NavigationBar(ft.Container):
 				expand=True,
 				controls= self.NodeList,
 				horizontal=True,
+				auto_scroll=True,
 				padding= 5,
 				spacing= 10,
 				divider_thickness=2
@@ -1445,7 +1458,6 @@ class NavigationBar(ft.Container):
 		self._history.append(current.Previous())
 		self._FinalizeNavigation()
 		
-
 	def NavBackToPQ(self):
 		if len(self._history) > 1: self._history.pop()
 		self._FinalizeNavigation()
@@ -1587,7 +1599,11 @@ class TagEditor:
 			bArr= []
 			for tpl in self._ButtonDescriptors:
 				b = ft.Button(
-					content=tpl[0],
+					content=ft.Text(
+						tpl[0],
+						expand=True,
+						align= ft.Alignment.CENTER
+					),
 					on_click= tpl[1],
 					expand=True,
 					align= ft.Alignment.CENTER
@@ -1625,25 +1641,44 @@ class TagEditor:
 			self.bgcolor = th.Dim(th.ThemedBG(), 80)
 
 		def LoadTags(self):
-			self._TagViews = self._tagList.controls = [
-				TagView(
+			tl:list[TagView] = []
+			c = 1
+			for tag in list(t.Instances.values()):
+				tv = TagView(
 					tag,
 					TagView.Form.NORMAL,
 					True,
 					True,
 					True,
 					OnEditCallback= lambda evt: TagEditor.Editor().LoadTag(evt.control.GetTag()),
-					OnRemoveCallback= lambda evt: self._tagList.controls.remove(evt.control)
+					OnRemoveCallback= lambda evt: self._destroyTagInstance(evt.control)
 				)
-				for tag in list(t.Instances.values())
-			]
+				tv.key = ft.ScrollKey(c)
+				tl.append(tv)
+				c += 1
+
+			tl.sort(
+				key=lambda view: view.GetTag().name.upper()
+			)
+			
+			self._TagViews = self._tagList.controls = tl
+			self._tagList.controls.append(
+				ft.Container(expand=True, key=ft.ScrollKey(c), aspect_ratio=10)
+			)
 
 		def _CreateNew(self):
-			TagEditor.Editor().LoadTag(t.New("","#777"))
+			TagEditor.Editor().Clear()
+			#TagEditor.Editor().LoadTag(t.New("","#777"))
 
 		def _ToggleSelectAll(self, toggle:bool):
 			for view in self._TagViews:
 				view.Select(toggle)
+
+		def _destroyTagInstance(self, view:TagView):
+			tag = t.Instances.pop(view.GetTag().identifier)
+			if tag is TagEditor().Editor().GetCurrentTag():
+				TagEditor.Editor().Clear()
+			self._TagViews.remove(view)
 
 		def _DestroySelected(self, DestroyButton:ft.Button):
 			self._destroyAllClicks += 1
@@ -1679,6 +1714,8 @@ class TagEditor:
 						t.Instances.pop(view.GetTag().identifier)
 						self._TagViews.remove(view) # so that the list also clears
 					
+		def MainControl(self):
+			return self._tagList
 
 	@UTIL.singleton
 	class Editor(ft.Container):
@@ -1688,22 +1725,41 @@ class TagEditor:
 			self.TitleField = ft.TextField(
 				expand=1,
 				label="Tag Name",
-				input_filter= ft.InputFilter(r"[a-zA-Z0-9]"),
+				input_filter= ft.InputFilter(r"^[a-zA-Z0-9]*$"),
 				filled=True,
-				on_change= self.FlushTextChanges
+				cursor_color= th.ThemeColors["HiltColor"]
+				#on_change= self.FlushTextChanges
 			)
+			th.MockOrnationMode(
+				lambda: th.ApplyFieldTheme(
+					self.TitleField,
+					th.ThemeColors["HiltColor"]
+				),
+				cf.OrnationModeENUM.CONTOUR
+			)
+			
 			self.ColorPicker = HexHSVColorPicker(
 				on_color_changed= self.FlushColorChanges
 			)
 			self.ColorPicker.expand = 5
-			
+			self.SaveButton = ft.Button(
+				content= ft.Text(
+					value= "Save Tag",
+					expand= True,
+					align= ft.Alignment.CENTER
+				),
+				on_click=self.SaveAndReload,
+				disabled= True
+			)
+			th.BTA_Accent(self.SaveButton)
 			###
 			self._mainColumn = ft.Column(
 				expand=True,
 				controls=[
 					self.TitleField,
 					self.ColorPicker,
-					ft.Container(expand=4)
+					ft.Container(expand=3),
+					self.SaveButton
 				]
 			)
 
@@ -1721,14 +1777,46 @@ class TagEditor:
 			self.TitleField.value = tag.name
 			self.TitleField.fill_color = th.taj(tag.color)
 			self.ColorPicker.SetWithHex(tag.color)
+			self.SaveButton.disabled = False
+
+		def GetCurrentTag(self):
+			return self._loadedTag
+
+		async def SaveAndReload(self):
+			ntFlag = False
+			if self._loadedTag is None:
+				emptyTitleCheck = self.TitleField.value == ""
+				whitespaceTitleCheck = self.TitleField.value.isspace()
+				ntFlag = True
+				if not (emptyTitleCheck or whitespaceTitleCheck):
+					self._loadedTag = t.New(
+						self.TitleField.value,
+						"#000"
+					)
+			self._loadedTag.color = self.ColorPicker.CurrentColor
+			self._loadedTag.name = self.TitleField.value
+			TagEditor.Lister().LoadTags()
+			TagEditor.Lister().MainControl().update()
+			if ntFlag:
+				await TagEditor.Lister().MainControl().scroll_to(
+					scroll_key=len(TagEditor.Lister().MainControl().controls)-1,
+					duration=1000
+				)
+
+		def Clear(self):
+			self._loadedTag = None
+			self.ColorPicker.SetWithHex("#444")
+			self.TitleField.value = ""
+			self.SaveButton.disabled = False
 
 		def FlushColorChanges(self, evt:ft.Event[HexHSVColorPicker]):
 			if not self._loadedTag: return
-			self._loadedTag.color = evt.data
+			#self._loadedTag.color = evt.data
 			self.TitleField.fill_color = th.taj(str(evt.data))
 			try: self.update() 
 			except RuntimeError: pass
 
+		#due for removal
 		def FlushTextChanges(self,evt:ft.Event[ft.TextField]):
 			if not self._loadedTag: return
 			self._loadedTag.name = evt.data
@@ -2144,6 +2232,7 @@ def main(page:ft.Page):
 	)
 	
 	page.add(MainGrid())
+	page.title = "ZanProjekto"
 
 	window = page.window	
 	window.resizable = False
@@ -2173,4 +2262,6 @@ async def RestartApp():
 	
 	
 
-if __name__ == "__main__": Render()
+if __name__ == "__main__": 
+	Core.Setup()
+	Render()

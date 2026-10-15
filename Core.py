@@ -175,11 +175,19 @@ class Projekt:
 				]
 			}
 			projesh.write(UTIL.json.dumps(payload, indent="\t"))
+		
+			
 
 	def OpenInExplorer(self):
 		fm.show_in_file_manager(
 			str(self._folder)
 		)
+
+	def __del__(self):
+		try: 
+			self.Save()
+			self._folder.rename(self._folder.parent / self._name)
+		except FileNotFoundError: return
 
 	#endregion
 
