@@ -3,6 +3,7 @@ from Core import (
 	Projekt as p,
 	Tag as t, 
 	Task as tk,
+	IgnoranceTerm as itr,
 	Settings as cf
 )
 
@@ -229,7 +230,7 @@ class TagSelector(ft.Container):
 		###
 		super().__init__(
 			expand=True,
-			bgcolor= ft.Colors.GREY_900,
+			bgcolor= th.taj(th.ThemeColors["FlatColor"]),
 			content= self.level1Column,
 			visible= False,
 			left=15, right=15, top=15, bottom=15
@@ -1009,6 +1010,8 @@ class TaskSimpleView(ft.Container):
 			cf.OrnationModeENUM.CONTOUR
 		)
 
+		self.UpdateCompletionState()
+
 	def OnHover(self, evt:ft.Event[ft.Container]):
 		if self._task.Complete: return
 		decValue:ft.TextDecoration
@@ -1020,6 +1023,9 @@ class TaskSimpleView(ft.Container):
 	def OnBulletClick(self, evt:ft.Event[ft.Container]):
 		self._task.Complete = not self._task.Complete
 		decValue:ft.TextDecoration
+		self.UpdateCompletionState()
+		
+	def UpdateCompletionState(self):
 		match self._task.Complete:
 			case True: decValue = ft.TextDecoration.LINE_THROUGH
 			case False: decValue = ft.TextDecoration.UNDERLINE
@@ -1224,6 +1230,14 @@ class SearchBox(ft.Container):
 			on_click= lambda evt: self.PromptTagSelect()
 		)
 
+		self.IgnoranceButton = ft.Container(
+			aspect_ratio=1,
+			expand=1,
+			content=ft.Icon(ft.Icons.REMOVE),
+			bgcolor= ft.Colors.BLUE_900,
+			on_click= lambda evt: self.OpenIgnoranceEditor()
+		)
+
 		###
 		self.SearchBar = ft.TextField(
 			expand=3,
@@ -1245,7 +1259,8 @@ class SearchBox(ft.Container):
 					expand= 9,
 					border_radius= 10
 				),
-				self.AddTagButton
+				self.AddTagButton,
+				self.IgnoranceButton
 			],
 			spacing=5
 		)
@@ -1310,6 +1325,9 @@ class SearchBox(ft.Container):
 				)
 			]
 		)
+
+	def OpenIgnoranceEditor(self):
+		IgnoranceEditor().Open()
 	
 	def Query(self): 
 		tList: list[t] = [view.GetTag() for view in self.TagBar.controls]
@@ -2038,6 +2056,195 @@ class SettingsEditor(ft.Container):
 
 #endregion
 
+#region IgnoranceEditor
+@UTIL.singleton
+class IgnoranceEditor(ft.Container):
+	class IgnoranceTerm (ft.Container):
+		def __init__(self, item:itr):
+			self._item = item
+			###
+			self.TermField = ft.TextField(
+				value = item.Term,
+				input_filter=ft.InputFilter("[^]"),
+				expand= 7,
+				on_change= self.ChangeTerm,
+				cursor_color=th.AbsoluteColor()
+			)
+			th.MockOrnationMode(
+				lambda: th.FTA_Contrast(self.TermField),
+				cf.OrnationModeENUM.CONTOUR
+			)
+			
+			self.IsStartButton = ft.Container(
+				content= ft.Icon(ft.Icons.KEYBOARD_ARROW_UP),
+				expand=1,
+				aspect_ratio=1,
+				on_click= self.ToggleIsStart,
+			)
+			th.IC_AddInk(self.IsStartButton)
+
+			self.IsEndButton = ft.Container(
+				content=ft.Icon(ft.Icons.ATTACH_MONEY),
+				expand=1,
+				aspect_ratio=1,
+				on_click= self.ToggleIsEnd,
+			)
+			th.IC_AddInk(self.IsEndButton)
+
+			self.ProjektTargeterButton = ft.Container(
+				content= ft.Icon(ft.Icons.ADD_TASK_OUTLINED),
+				expand=1,
+				aspect_ratio=1,
+				on_click= self.ToggleProjektTargeting,
+			)
+			th.IC_AddInk(self.ProjektTargeterButton)
+
+			self.DestroyButton = ft.Container(
+				content= ft.Icon(ft.Icons.DELETE_OUTLINE),
+				expand=1,
+				aspect_ratio=1,
+				on_click= self.DestroyInstance
+			)
+			th.ApplyContainerTheme(
+				self.DestroyButton,
+				th.ThemeColors["HiltColor"]
+			)
+			th.IC_AddInk(self.DestroyButton)
+
+			###
+			self.mainRow = ft.Row(
+				controls=[
+					self.TermField,
+					self.ProjektTargeterButton,
+					self.IsStartButton,
+					self.IsEndButton,
+					self.DestroyButton
+				],
+				expand=True
+			)
+
+			###
+			super().__init__(
+				aspect_ratio=5,
+				content=self.mainRow,
+				expand=True,
+				padding= 10,
+				border_radius=5
+			)
+			th.MockOrnationMode(
+				lambda: th.CTA_Accent(self),
+				cf.OrnationModeENUM.UNBOUND
+			)
+			self.bgcolor = th.Dim(str(self.bgcolor), 40)
+			self.Refresh()
+
+		def Refresh(self):
+			match self._item.IsStart:
+				case True:
+					th.CTA_Accent(self.IsStartButton)
+				case False:
+					th.CTA_Contrast(self.IsStartButton)
+
+			match self._item.IsEnd:
+				case True:
+					th.CTA_Accent(self.IsEndButton)
+				case False:
+					th.CTA_Contrast(self.IsEndButton)
+
+			match self._item.AlsoTargetsProjekts:
+				case True:
+					th.CTA_Accent(self.ProjektTargeterButton)
+				case False:
+					th.CTA_Contrast(self.ProjektTargeterButton)
+
+		def ChangeTerm(self):
+			self._item.Term = self.TermField.value
+
+		def ToggleIsStart(self):
+			self._item.IsStart = not self._item.IsStart
+			self.Refresh()
+
+		def ToggleIsEnd(self):
+			self._item.IsEnd = not self._item.IsEnd
+			self.Refresh()
+
+		def ToggleProjektTargeting(self):
+			self._item.AlsoTargetsProjekts = not self._item.AlsoTargetsProjekts
+			self.Refresh()
+
+		def DestroyInstance(self):
+			itr.instances.remove(
+				self._item
+			)
+			IgnoranceEditor().TermList.controls.remove(self)
+
+	def __init__(self):
+		self.QuitButton = ft.Container(
+			expand=1,
+			aspect_ratio=2,
+			bgcolor="#f33",
+			align= ft.Alignment.TOP_RIGHT,
+			content= ft.Icon(ft.Icons.CLOSE),
+			on_click= self.Close
+		)
+		
+		self.TermList = ft.ListView(
+			auto_scroll= True,
+			expand=8
+		)
+		self._makeTermButton = ft.Button(
+			content=ft.Text(
+				value="Add Ignore Term",
+				align=ft.Alignment.CENTER,
+				expand=True
+			),
+			expand=1,
+			on_click= self.CreateTerm 
+		)
+		th.BTA_Accent(self._makeTermButton)
+
+		self._mainCoulmn = ft.Column(
+			controls=[
+				self.QuitButton,
+				self.TermList,
+				self._makeTermButton
+			],
+			expand=True
+		)
+
+		super().__init__(
+			expand=True,
+			bgcolor= th.taj(th.ThemeColors["FlatColor"]),
+			content= self._mainCoulmn,
+			visible= False,
+			left=15, right=15, top=15, bottom=15,
+			padding=10
+		)
+		th.MockOrnationMode(
+			lambda: th.CTA_Accent(self),
+			cf.OrnationModeENUM.BOUND
+		)
+		self.bgcolor = th.Dim(str(self.bgcolor), 70)
+
+	def Open(self, asOverlay:bool = True):
+		self.TermList.controls = [
+			IgnoranceEditor.IgnoranceTerm(item)
+			for item in itr.instances
+		]
+		self.QuitButton.visible = asOverlay
+		self.visible = True
+
+
+	def Close(self):
+		self.visible = False
+
+	def CreateTerm(self):
+		self.TermList.controls.append(
+			self.IgnoranceTerm(itr(""))
+		)
+
+#endregion
+
 #region GlobalUI
 @UTIL.singleton
 class EditorSwitcher(ft.Container):
@@ -2087,11 +2294,13 @@ class EditorSwitcher(ft.Container):
 		NavigationBar().visible = t
 		ProjektList().visible = t
 		ProjektFullView().visible = t
-
+		
 		if t == False:
 			TaskFullView().visible = False
 			TagSelector().Close()
 			ProjektCreator().Close()
+		else:
+			IgnoranceEditor().Close()
 
 	def ToggleTag(self, t:bool):
 		TagEditor.Lister().visible = t
@@ -2099,6 +2308,9 @@ class EditorSwitcher(ft.Container):
 
 	def ToggleConfig(self, t:bool):
 		SettingsEditor().visible = t
+
+		if t == True:
+			IgnoranceEditor().Open(False)
 
 @UTIL.singleton
 class MainGrid(ft.Container):
@@ -2216,7 +2428,9 @@ def main(page:ft.Page):
 		ProjektCreator(),
 		TagSelector(),
 
-		TagEditor.Lister()
+		TagEditor.Lister(),
+
+		IgnoranceEditor()
 	])
 	MainGrid().GetFullViewArea().controls.extend([
 		ProjektFullView(),
@@ -2237,14 +2451,18 @@ def main(page:ft.Page):
 	window = page.window	
 	window.resizable = False
 
-	#page.on_close = lambda: RestartApp()
+	#page.on_close = PreShutDown
 	
-
 def Render():
 	global ChosenSM; ChosenSM = ShutdownMode.PERMANENT_SHUTDOWN
 	ft.run(main)
+	ProjektFullView().Reload()
+
 
 async def RestartApp():
+
+	ProjektFullView().Reload()
+
 	global ChosenSM; ChosenSM = ShutdownMode.PENDING_RESTART
 	TaskFullView.Destroy()
 	TagSelector.Destroy()
@@ -2260,7 +2478,7 @@ async def RestartApp():
 	MainGrid.Destroy()
 	await window.close()
 	
-	
+
 
 if __name__ == "__main__": 
 	Core.Setup()

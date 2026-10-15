@@ -89,7 +89,12 @@ class Projekt:
 		return inst
 
 	@classmethod
-	def CollectFromDir(cls, dir:str, recursive:bool = True):
+	def CollectFromDir(
+		cls,
+		dir:str,
+		recursive:bool = True,
+		softOnly:bool = False
+	):
 		result :list[Projekt] = []
 
 		def Inner(dir:str):
@@ -100,10 +105,35 @@ class Projekt:
 
 			for pth in DirObj.iterdir():
 				if not pth.is_dir(): continue
-				if Projekt.DefinedAt(pth):
-					result.append(Projekt.Load(pth))
+
+				isProjekt = Projekt.DefinedAt(pth)
+
+				Prickles:list[IgnoranceTerm]
+				if softOnly: Prickles = IgnoranceTerm.GetSoftPruners()
+				else: Prickles = IgnoranceTerm.instances
+
+				ignoreFlag = False
+				KeepProjektFlag = True
+				for item in Prickles:
+					pm = UTIL.re.search(
+						item.GetPattern(),
+						pth.name,
+					)
+					if pm != None:
+						ignoreFlag = True
+						if KeepProjektFlag and item.AlsoTargetsProjekts:
+							KeepProjektFlag = False
+
+				if isProjekt:
+					if (not ignoreFlag) or (ignoreFlag and KeepProjektFlag):
+						result.append(Projekt.Load(pth))
 					
-				if recursive: Inner((str(pth)))
+					if recursive: Inner((str(pth)))
+				else:
+					if ignoreFlag:
+						continue
+					elif recursive: Inner((str(pth)))
+
 
 		Inner(dir)
 		
@@ -182,12 +212,6 @@ class Projekt:
 		fm.show_in_file_manager(
 			str(self._folder)
 		)
-
-	def __del__(self):
-		try: 
-			self.Save()
-			self._folder.rename(self._folder.parent / self._name)
-		except FileNotFoundError: return
 
 	#endregion
 
@@ -283,12 +307,12 @@ class Task:
 		self.Deadline = Dead
 		self.Complete = State
 	#endregion
+
 #endregion
 
 #region Config
 @UTIL.singleton
 class Settings:
-	pass
 	#region CLASS
 	STNG_FILE = "settings.kto"
 
@@ -339,6 +363,84 @@ class Settings:
 			settingsfile.write(UTIL.json.dumps(state,indent="\t"))
 		
 	#endregion
+
+class IgnoranceTerm:
+	#region CLASS
+	IGNORE_FILE = "ignore.kto"
+
+	class TermJSON(UTIL.TypedDict):
+		Term:str
+		IsStart:bool
+		IsEnd:bool
+		AlsoTargetsProjekts:bool
+
+	JSON = list[TermJSON]
+
+	instances:list[IgnoranceTerm] = []
+	
+	@classmethod
+	def LoadIgnoranceTerms(cls):
+		fp = Path(Settings().GetSuperDir())/IgnoranceTerm.IGNORE_FILE
+		with fp.open("r") as ignorefile:
+			ktoStruct: IgnoranceTerm.JSON = UTIL.json.loads(ignorefile.read())
+			IgnoranceTerm.instances = [
+				IgnoranceTerm(
+					entry["Term"],
+					entry["IsStart"],
+					entry["IsEnd"],
+					entry["AlsoTargetsProjekts"]
+				)
+				for entry in ktoStruct
+			]
+
+	@classmethod
+	def GetSoftPruners(cls):
+		return [
+			item for item in IgnoranceTerm.instances
+			if item.AlsoTargetsProjekts == False
+		]
+
+	@classmethod
+	def Save(cls):
+		fp = Path(Settings().GetSuperDir())/IgnoranceTerm.IGNORE_FILE
+		with fp.open("w") as ignorefile:
+			ktoStruct: IgnoranceTerm.JSON = [
+				{
+					"Term": inst.Term,
+					"IsStart": inst.IsStart,
+					"IsEnd": inst.IsEnd,
+					"AlsoTargetsProjekts":inst.AlsoTargetsProjekts
+				}
+				for inst in IgnoranceTerm.instances
+			]
+			ignorefile.write(UTIL.json.dumps(ktoStruct,indent="\t"))
+
+	#endregion
+
+
+	#region INSTANCE
+	def __init__(
+		self,
+		term:str,
+		isStart:bool = False,
+		isEnd:bool = False,
+		alsoTargetsProjekts:bool = False
+	):
+		self.Term = term
+		self.IsStart = isStart
+		self.IsEnd = isEnd
+		self.AlsoTargetsProjekts = alsoTargetsProjekts
+		IgnoranceTerm.instances.append(self)
+
+	def GetPattern(self):
+		p = ""
+		if self.IsStart: p += "^"
+		p += self.Term
+		if self.IsEnd: p += "$"
+		return p
+
+	#endregion
+
 #endregion
 
 #region Main
@@ -410,11 +512,19 @@ def Setup():
 			stngfile.write(UTIL.json.dumps(defaultJSON))
 	except FileExistsError: pass
 	Settings()
+	
 	try: 
 		with (Settings().GetSuperDir() / Tag.TAG_KTO_FILE).open("x") as tagfile:
 			tagfile.write("{}")
 	except FileExistsError: pass
 	Tag.LoadTags()
+
+	igfPath = Settings().GetSuperDir() / IgnoranceTerm.IGNORE_FILE
+	try:
+		with igfPath.open("x") as ignorefile:
+			ignorefile.write("[]")
+	except FileExistsError: pass
+	IgnoranceTerm.LoadIgnoranceTerms()
 
 def Terminate():
 	print("Terminating")
@@ -423,8 +533,21 @@ def Terminate():
 	print("Saved remaining Projekts")
 	Tag.Save()
 	print("Saved Tags")
+	IgnoranceTerm.Save()
+	print("Saved Ignorations")
 	Settings().Save()
 	print("Saved Settings")
+
+	for p in Projekt.CollectFromDir(
+		str(Settings().GetSuperDir()),
+		softOnly=True
+	):
+		try:
+			p.GetFolder().rename(
+				p.GetFolder().parent / p.GetName()
+			)
+		except PermissionError:
+			print(f"Could not rename the folder of {p.GetName()} \n at {p.GetFolder()}")
 
 if __name__ == "__main__": pass
 
